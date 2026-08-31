@@ -45,7 +45,7 @@ set_source_files_properties(
 
 # MetaX-only source: no main-tree source exists for the override mechanism.
 target_sources(TritonTools PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/spec_cpp/extra/SwizzleDumpUtils.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/spec_cpp/lib/Tools/SwizzleDumpUtils.cpp
 )
 
 if(BUILD_MCTLE)
