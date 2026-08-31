@@ -145,9 +145,7 @@ function(flagtree_apply_backend_source_overrides backend_root)
 
     list(LENGTH _spec_sources_in_core_root _candidate_count)
     if(_candidate_count EQUAL 0)
-      message(FATAL_ERROR
-        "Backend spec source ${_spec_source} has no owner target in the "
-        "configured core roots for mirrored main source ${_relative_path}")
+      continue()
     elseif(_candidate_count GREATER 1)
       message(FATAL_ERROR
         "Backend spec source ${_spec_source} matches multiple preferred main "
