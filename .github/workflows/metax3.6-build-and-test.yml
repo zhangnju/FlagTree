@@ -83,8 +83,13 @@ jobs:
         run: |
           set -x
           source ~/env.sh
+          export TRITON_REPRODUCER_PATH="${RUNNER_TEMP:-/tmp}/metax-unit-reproducer"
           cd third_party/metax/python/test/unit
-          python3 -m pytest -s . \
+          python3 -m pytest . \
+            --capture=fd \
+            --show-capture=stderr \
+            --tb=short \
+            --maxfail=1 \
             --ignore=runtime/test_specialize.py \
             --ignore=tools/test_aot.py \
             --ignore=language/test_matmul.py \
