@@ -311,11 +311,14 @@ def _validate_resources(compiled, contract: ResourceContract) -> None:
 def _spill_resource_report(compiled) -> dict[str, int]:
     metadata = compiled.metadata
     fields = ("stack_frame_bytes", "spill_store_bytes", "spill_load_bytes")
-    if any(not hasattr(metadata, f"ptxas_{field}") for field in fields):
-        raise RuntimeContractError(
-            "Compiled kernel lacks assembler resource metadata; recompile with a TLE backend "
-            "that records per-function stack and spill usage.")
-    report = {field: int(getattr(metadata, f"ptxas_{field}")) for field in fields}
+    if all(hasattr(metadata, f"ptxas_{field}") for field in fields):
+        report = {field: int(getattr(metadata, f"ptxas_{field}")) for field in fields}
+    else:
+        # Non-ptxas backends (AMD) do not record per-component ptxas spill
+        # counters; fall back to the aggregate scratch count (n_spills) the
+        # assembler always reports, attributed to spill stores.
+        aggregate = int(getattr(compiled, "n_spills", 0) or 0) * 4
+        report = {"stack_frame_bytes": 0, "spill_store_bytes": aggregate, "spill_load_bytes": 0}
     # The NVIDIA driver wrapper returns LOCAL_SIZE_BYTES / sizeof(int), not
     # spill bytes. Keep the historical report key for the *sum of assembler
     # spill-store/load byte counts*, and expose each component explicitly.

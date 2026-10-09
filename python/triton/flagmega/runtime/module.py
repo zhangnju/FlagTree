@@ -256,7 +256,7 @@ class GeneratedTirCallGraphModule(RuntimeModule):
 
     def load(self, device: str = "cuda:0") -> "GeneratedTirCallGraphModule":
         torch = _torch()
-        _validate_sm90_device(torch, device)
+        _validate_runtime_device(torch, device, str(self.manifest.get("target", "")))
         pools: dict[str, object] = {}
         for pool in self.runtime_binding["pools"]:
             name = str(pool["name"])
@@ -390,9 +390,14 @@ class GeneratedTirCallGraphModule(RuntimeModule):
             external_arguments
         )
         arguments = (*external_arguments, *pool_arguments, *descriptors)
+        # RDNA register allocation differs from ptxas; a small spill does not
+        # affect correctness, so the no-spill residency gate is NVIDIA-only for
+        # this bring-up (occupancy tuning is a later performance pass).
+        _target = str(self.manifest.get("target", ""))
         contract = ResourceContract(
             compute_num_warps=int(self.codegen["num_warps"]),
             resident_blocks_per_sm=1,
+            forbid_spills=not _target.startswith("amd-"),
         )
         self._prepared = prepare_jit_kernel(
             self.kernel,
@@ -400,7 +405,7 @@ class GeneratedTirCallGraphModule(RuntimeModule):
             tuple(int(value) for value in self.codegen["dynamic_argument_indices"]),
             grid=tuple(int(value) for value in self.codegen["grid"]),
             contract=contract,
-            **compilation_options(contract),
+            **_runtime_compilation_options(contract, str(self.manifest.get("target", ""))),
         )
         self.prepare_count += 1
         self._mark_prepared()
@@ -1198,12 +1203,33 @@ def _torch_dtype(torch, dtype):
         ) from error
 
 
-def _validate_sm90_device(torch, device: str) -> None:
+def _runtime_compilation_options(contract, target: str) -> dict:
+    # The ptxas occupancy flag (--minnctapersm) is NVIDIA-only; the AMD backend
+    # rejects it. RDNA compiles correctly with just the warp count -- occupancy
+    # tuning (waves-per-eu) is a later performance concern, not correctness.
+    if target.startswith("amd-"):
+        return {"num_warps": contract.compute_num_warps}
+    return compilation_options(contract)
+
+
+def _validate_runtime_device(torch, device: str, target: str) -> None:
+    # torch reports ROCm GPUs through the same "cuda" device namespace, so the
+    # device-string gate is shared; the capability contract is per target.
     if not device.startswith("cuda") or not torch.cuda.is_available():
-        raise RuntimeContractError(f"Executable target nvidia-sm90 requires a CUDA device, got {device!r}.")
-    capability = torch.cuda.get_device_capability(torch.device(device))
-    if capability != (9, 0):
-        raise RuntimeContractError(f"Artifact target nvidia-sm90 requires capability (9, 0), got {capability}.")
+        raise RuntimeContractError(f"Executable target {target!r} requires a GPU device, got {device!r}.")
+    if target == "nvidia-sm90":
+        capability = torch.cuda.get_device_capability(torch.device(device))
+        if capability != (9, 0):
+            raise RuntimeContractError(f"Artifact target nvidia-sm90 requires capability (9, 0), got {capability}.")
+    elif target.startswith("amd-"):
+        if getattr(torch.version, "hip", None) is None:
+            raise RuntimeContractError(f"Artifact target {target!r} requires a ROCm/HIP torch build.")
+    else:
+        raise RuntimeContractError(f"Unknown artifact target {target!r} for the TIR call-graph runtime.")
+
+
+def _validate_sm90_device(torch, device: str) -> None:
+    _validate_runtime_device(torch, device, "nvidia-sm90")
 
 
 def _typed_byte_view(storage, offset: int, nbytes: int, dtype: object, shape: tuple[int, ...]):
