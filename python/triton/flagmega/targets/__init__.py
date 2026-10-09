@@ -9,8 +9,12 @@ from triton.flagmega.targets.ntt_options import NttTargetOptions, PyNttTargetOpt
 from triton.flagmega.targets.pyntt import PyNttTarget
 from triton.flagmega.targets.machine import NttTargetMachine
 from triton.flagmega.targets.nvidia.machine import NvidiaSm90Machine
+from triton.flagmega.targets.amd_gfx1100 import AmdGfx1100Target
+from triton.flagmega.targets.amd_gfx1201 import AmdGfx1201Target
 
 register_target(NvidiaSm90Target())
+register_target(AmdGfx1100Target())
+register_target(AmdGfx1201Target())
 
 __all__ = [
     "NttTargetOptions",
