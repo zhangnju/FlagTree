@@ -1221,6 +1221,10 @@ def _validate_runtime_device(torch, device: str, target: str) -> None:
         capability = torch.cuda.get_device_capability(torch.device(device))
         if capability != (9, 0):
             raise RuntimeContractError(f"Artifact target nvidia-sm90 requires capability (9, 0), got {capability}.")
+    elif target == "nvidia-sm89":
+        capability = torch.cuda.get_device_capability(torch.device(device))
+        if capability[0] != 8:
+            raise RuntimeContractError(f"Artifact target nvidia-sm89 requires an 8.x (Ada) GPU, got {capability}.")
     elif target.startswith("amd-"):
         if getattr(torch.version, "hip", None) is None:
             raise RuntimeContractError(f"Artifact target {target!r} requires a ROCm/HIP torch build.")

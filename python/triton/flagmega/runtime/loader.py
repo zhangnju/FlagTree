@@ -27,6 +27,8 @@ def _register_builtin_packages() -> None:
     # differs only in device validation (HIP vs CUDA capability).
     package_registry.register("tir_call_graph/v1", "amd-gfx1100", create_tir_runtime)
     package_registry.register("tir_call_graph/v1", "amd-gfx1201", create_tir_runtime)
+    # Ada (sm_89, e.g. RTX 4090) runs the same portable TIR call graph.
+    package_registry.register("tir_call_graph/v1", "nvidia-sm89", create_tir_runtime)
 
 
 _register_builtin_packages()
