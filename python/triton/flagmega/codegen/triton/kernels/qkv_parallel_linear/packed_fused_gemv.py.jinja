@@ -6,6 +6,10 @@
 {{ entry.kernel_decorator(call) }}
 def {{ call.symbol }}({{ call.signature }}):
 {{ entry.mesh_coordinates() }}
+{% if call.local_m != 1 %}
+    for qkv_local_m in tl.range(0, {{ call.local_m }}):
+{% endif %}
+{% filter indent(4 if call.local_m != 1 else 0, first=True) %}
 {% for output in call.outputs %}
     for qkv_local_n_start in tl.range(
         0, {{ output.local_n_capacity }}, {{ call.tile_n }}
@@ -56,6 +60,7 @@ def {{ call.symbol }}({{ call.signature }}):
             mask=qkv_n_mask,
         )
 {% endfor %}
+{% endfilter %}
 
 
 {% endif %}
