@@ -72,6 +72,14 @@ def _elementwise_semantic_op(node: Node) -> str:
     return node.op
 
 
+def _native_gguf_applicable(implementation, native_quant) -> bool:
+    # Native GGUF weights run only on the SIMT template; its fp8-free native
+    # implementation must not serve a block-FP8 (activation-quantizing) call.
+    if native_quant is not None:
+        return implementation.variant == "simt"
+    return implementation.contract.get("weight_encoding") != "gguf_native"
+
+
 class BlockFp8CandidateProvider:
     op_names = frozenset({
         "math.block_scaled_matmul",
@@ -90,7 +98,7 @@ class BlockFp8CandidateProvider:
         candidates = tuple(
             context.configure_implementation(implementation)
             for implementation in context.implementations("block_fp8")
-            if (native_quant is None or implementation.variant == "simt")
+            if _native_gguf_applicable(implementation, native_quant)
             and (implementation.variant != "mma" or mma_legal))
         if not candidates:
             return None
@@ -109,7 +117,7 @@ class MatmulGluCandidateProvider:
         candidates = tuple(
             context.configure_implementation(implementation)
             for implementation in context.implementations("matmul_glu")
-            if native_quant is None or implementation.variant == "simt")
+            if _native_gguf_applicable(implementation, native_quant))
         if not candidates:
             return None
         return _proposal(candidates, context.choose_default("matmul_glu", candidates))
