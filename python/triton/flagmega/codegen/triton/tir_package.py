@@ -8,6 +8,11 @@ import re
 from collections.abc import Mapping
 from math import prod
 
+from triton.flagmega.codegen.triton.amd_uniform_parameters import (
+    add_uniform_parameter_prologue,
+    amd_uniform_parameters,
+    skipped_symbols,
+)
 from triton.flagmega.codegen.triton.amd_prefetch import (
     add_next_invocation_qkv_prefetch,
     add_split_k_weight_tile_prefetch,
@@ -344,6 +349,7 @@ def describe_tir_package(
         "pipeline_schedule": pipeline_schedule,
         "device_functions": source_schedule["device_functions"] if source_schedule else [],
         "amd_prefetch": amd_prefetch,
+        "amd_uniform_parameters": amd_uniform_parameters(platform, architecture),
         "use_tle": pipeline_schedule is not None or cooperative,
         "kernel_templates": kernel_templates,
         "kernel_template_specs": plain_package_value(raw_templates),
@@ -464,7 +470,10 @@ def render_tir_package(
         "renderer_version": renderer_version,
         "entry_template": "entrypoints/call_graph.py.jinja",
     }
-    return TritonTemplateRegistry().render("module.py.jinja", context)
+    source = TritonTemplateRegistry().render("module.py.jinja", context)
+    if descriptor.get("amd_uniform_parameters"):
+        source = add_uniform_parameter_prologue(source, skipped_symbols(descriptor.get("render_calls") or ()))
+    return source
 
 
 def _expand_entry_events(
